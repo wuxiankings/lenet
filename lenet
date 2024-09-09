@@ -1,0 +1,281 @@
+# 导入pytorch库
+import torch
+# 导入torch.nn模块
+from torch import nn
+
+import torch
+from torch import nn
+# from model import MyLeNet5
+# lr_scheduler：提供一些根据epoch训练次数来调整学习率的方法
+from torch.optim import lr_scheduler
+# torchvision：PyTorch的一个图形库，服务于PyTorch深度学习框架的，主要用来构建计算机视觉模型
+# transforms：主要是用于常见的一些图形变换
+# datasets：包含加载数据的函数及常用的数据集接口
+from torchvision import datasets, transforms
+# os：operating system（操作系统），os模块封装了常见的文件和目录操作
+import os
+
+import torch
+#from model import MyLeNet5
+from torch.autograd import Variable
+from torchvision import datasets, transforms
+from torchvision.transforms import ToPILImage
+
+
+# 定义LeNet网络模型
+# MyLeNet5（子类）继承nn.Module（父类）
+class MyLeNet5(nn.Module):
+    # 子类继承中重新定义Module类的__init__()和forward()函数
+    # init()函数：进行初始化，申明模型中各层的定义
+    def __init__(self):
+        # super：引入父类的初始化方法给子类进行初始化
+        super(MyLeNet5, self).__init__()
+        # 卷积层，输入大小为28*28，输出大小为28*28，输入通道为1，输出为6，卷积核为5，扩充边缘为2
+        self.c1 = nn.Conv2d(in_channels=1, out_channels=6, kernel_size=5, padding=2)
+        # 使用sigmoid作为激活函数
+        self.Sigmoid = nn.Sigmoid()
+        # AvgPool2d：二维平均池化操作
+        # 池化层，输入大小为28*28，输出大小为14*14，输入通道为6，输出为6，卷积核为2，步长为2
+        self.s2 = nn.AvgPool2d(kernel_size=2, stride=2)
+        # 卷积层，输入大小为14*14，输出大小为10*10，输入通道为6，输出为16，卷积核为5
+        self.c3 = nn.Conv2d(in_channels=6, out_channels=16, kernel_size=5)
+        # 池化层，输入大小为10*10，输出大小为5*5，输入通道为16，输出为16，卷积核为2，步长为2
+        self.s4 = nn.AvgPool2d(kernel_size=2, stride=2)
+        # 卷积层，输入大小为5*5，输出大小为1*1，输入通道为16，输出为120，卷积核为5
+        self.c5 = nn.Conv2d(in_channels=16, out_channels=120, kernel_size=5)
+        # Flatten()：将张量（多维数组）平坦化处理，张量的第0维表示的是batch_size（数量），所以Flatten()默认从第二维开始平坦化
+        self.flatten = nn.Flatten()
+        # 全连接层
+        # Linear（in_features，out_features）
+        # in_features指的是[batch_size, size]中的size,即样本的大小
+        # out_features指的是[batch_size，output_size]中的output_size，样本输出的维度大小，也代表了该全连接层的神经元个数
+        self.f6 = nn.Linear(120, 84)
+        # 全连接层&输出层
+        self.output = nn.Linear(84, 10)
+
+    # forward()：定义前向传播过程,描述了各层之间的连接关系
+    def forward(self, x):
+        # x输入为28*28*1， 输出为28*28*6
+        x = self.Sigmoid(self.c1(x))
+        # x输入为28*28*6，输出为14*14*6
+        x = self.s2(x)
+        # x输入为14*14*6，输出为10*10*16
+        x = self.Sigmoid(self.c3(x))
+        # x输入为10*10*16，输出为5*5*16
+        x = self.s4(x)
+        # x输入为5*5*16，输出为1*1*120
+        x = self.c5(x)
+        x = self.flatten(x)
+        # x输入为120，输出为84
+        x = self.f6(x)
+        # x输入为84，输出为10
+        x = self.output(x)
+        return x
+
+
+# 测试代码
+# 每个python模块（python文件）都包含内置的变量 __name__，当该模块被直接执行的时候，__name__ 等于文件名（包含后缀 .py ）
+# 如果该模块 import 到其他模块中，则该模块的 __name__ 等于模块名称（不包含后缀.py）
+# “__main__” 始终指当前执行模块的名称（包含后缀.py）
+# if确保只有单独运行该模块时，此表达式才成立，才可以进入此判断语法，执行其中的测试代码，反之不行
+if __name__ == "__main__":
+    # rand:返回一个张量，包含了从区间[0, 1)的均匀分布中抽取的一组随机数，此处为四维张量
+    x = torch.rand([1, 1, 28, 28])
+    # 模型实例化
+    model = MyLeNet5()
+    y = model(x)
+
+
+    # 数据转化为Tensor格式
+    # Compose()：将多个transforms的操作整合在一起
+    # ToTensor(): 将numpy的ndarray或PIL.Image读的图片转换成形状为(C,H, W)的Tensor格式，且归一化到[0,1.0]之间
+    data_transform = transforms.Compose([
+        transforms.ToTensor()
+    ])
+
+    # 加载训练数据集
+    # MNIST数据集来自美国国家标准与技术研究所, 训练集 (training set)、测试集(test set)由分别由来自250个不同人手写的数字构成
+    # MNIST数据集包含：Training set images、Training set images、Test set images、Test set labels
+    # train = true是训练集，false为测试集
+    train_dataset = datasets.MNIST(root='./data', train=True, transform=data_transform, download=True)
+    # DataLoader：将读取的数据按照batch size大小封装并行训练
+    # dataset (Dataset)：加载的数据集
+    # batch_size (int, optional)：每个batch加载多少个样本(默认: 1)
+    # shuffle (bool, optional)：设置为True时会在每个epoch重新打乱数据(默认: False)
+    train_dataloader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=16, shuffle=True)
+    # 加载测试数据集
+    test_dataset = datasets.MNIST(root='./data', train=False, transform=data_transform, download=True)
+    test_dataloader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=16, shuffle=True)
+
+    # 如果有NVIDA显卡，转到GPU训练，否则用CPU
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    # 模型实例化，将模型转到device
+    model = MyLeNet5().to(device)
+
+    # 定义损失函数（交叉熵损失）
+    loss_fn = nn.CrossEntropyLoss()
+
+    # 定义优化器(随机梯度下降法)
+    # params(iterable)：要训练的参数，一般传入的是model.parameters()
+    # lr(float)：learning_rate学习率，也就是步长
+    # momentum(float, 可选)：动量因子（默认：0），矫正优化率
+    optimizer = torch.optim.SGD(model.parameters(), lr=1e-3, momentum=0.9)
+
+    # 学习率，每隔10轮变为原来的0.1
+    # StepLR：用于调整学习率，一般情况下会设置随着epoch的增大而逐渐减小学习率从而达到更好的训练效果
+    # optimizer （Optimizer）：需要更改学习率的优化器
+    # step_size（int）：每训练step_size个epoch，更新一次参数
+    # gamma（float）：更新lr的乘法因子
+    lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+
+
+    # 定义训练函数
+    def train(dataloader, model, loss_fn, optimizer):
+        loss, current, n = 0.0, 0.0, 0
+        # dataloader: 传入数据（数据包括：训练数据和标签）
+        # enumerate()：用于将一个可遍历的数据对象(如列表、元组或字符串)组合为一个索引序列，一般用在for循环当中
+        # enumerate返回值有两个：一个是序号，一个是数据（包含训练数据和标签）
+        # x：训练数据（inputs）(tensor类型的），y：标签（labels）(tensor类型的）
+        for batch, (x, y) in enumerate(dataloader):
+            # 前向传播
+            x, y = x.to(device), y.to(device)
+            # 计算训练值
+            output = model(x)
+            # 计算观测值（label）与训练值的损失函数
+            cur_loss = loss_fn(output, y)
+            # torch.max(input, dim)函数
+            # input是具体的tensor，dim是max函数索引的维度，0是每列的最大值，1是每行的最大值输出
+            # 函数会返回两个tensor，第一个tensor是每行的最大值；第二个tensor是每行最大值的索引
+            _, pred = torch.max(output, axis=1)
+            # 计算每批次的准确率
+            # output.shape[0]一维长度为该批次的数量
+            # torch.sum()对输入的tensor数据的某一维度求和
+            cur_acc = torch.sum(y == pred) / output.shape[0]
+
+            # 反向传播
+            # 清空过往梯度
+            optimizer.zero_grad()
+            # 反向传播，计算当前梯度
+            cur_loss.backward()
+            # 根据梯度更新网络参数
+            optimizer.step()
+            # .item()：得到元素张量的元素值
+            loss += cur_loss.item()
+            current += cur_acc.item()
+            n = n + 1
+
+        train_loss = loss / n
+        train_acc = current / n
+        # 计算训练的错误率
+        print('train_loss' + str(train_loss))
+        # 计算训练的准确率
+        print('train_acc' + str(train_acc))
+
+
+    # 定义验证函数
+    def val(dataloader, model, loss_fn):
+        # model.eval()：设置为验证模式，如果模型中有Batch Normalization或Dropout，则不启用，以防改变权值
+        model.eval()
+        loss, current, n = 0.0, 0.0, 0
+        # with torch.no_grad()：将with语句包裹起来的部分停止梯度的更新，从而节省了GPU算力和显存，但是并不会影响dropout和BN层的行为
+        with torch.no_grad():
+            for batch, (x, y) in enumerate(dataloader):
+                # 前向传播
+                x, y = x.to(device), y.to(device)
+                output = model(x)
+                cur_loss = loss_fn(output, y)
+                _, pred = torch.max(output, axis=1)
+                cur_acc = torch.sum(y == pred) / output.shape[0]
+                loss += cur_loss.item()
+                current += cur_acc.item()
+                n = n + 1
+            # 计算验证的错误率
+            print("val_loss：" + str(loss / n))
+            # 计算验证的准确率
+            print("val_acc：" + str(current / n))
+            # 返回模型准确率
+            return current / n
+
+
+    # 开始训练
+    # 训练次数
+    epoch = 10
+    # 用于判断最佳模型
+    min_acc = 0
+    for t in range(epoch):
+        print(f'epoch {t + 1}\n---------------')
+        # 训练模型
+        train(train_dataloader, model, loss_fn, optimizer)
+        # 验证模型
+        a = val(test_dataloader, model, loss_fn)
+        # 保存最好的模型权重
+        if a > min_acc:
+            folder = 'save_model'
+            # path.exists：判断括号里的文件是否存在，存在为True，括号内可以是文件路径
+            if not os.path.exists(folder):
+                # os.mkdir() ：用于以数字权限模式创建目录
+                os.mkdir('save_model')
+            min_acc = a
+            print('save best model')
+            # torch.save(state, dir)保存模型等相关参数，dir表示保存文件的路径+保存文件名
+            # model.state_dict()：返回的是一个OrderedDict，存储了网络结构的名字和对应的参数
+            torch.save(model.state_dict(), 'save_model/best_model.pth')
+    print('Done!')
+
+
+# Compose()：将多个transforms的操作整合在一起
+data_transform = transforms.Compose([
+    # ToTensor()：数据转化为Tensor格式
+    transforms.ToTensor()
+])
+
+# 加载训练数据集
+train_dataset = datasets.MNIST(root='./data', train=True, transform=data_transform, download=True)
+# 给训练集创建一个数据加载器, shuffle=True用于打乱数据集，每次都会以不同的顺序返回
+train_dataloader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=16, shuffle=True)
+
+# 加载测试数据集
+test_dataset = datasets.MNIST(root='./data', train=False, transform=data_transform, download=True)
+test_dataloader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=16, shuffle=True)
+
+# 如果有NVIDA显卡，转到GPU训练，否则用CPU
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+# 模型实例化，将模型转到device
+model = MyLeNet5().to(device)
+
+# 加载train.py里训练好的模型
+#model.load_state_dict(torch.load("E:/buttle/lenet/save_model/best_model.pth"))
+
+# 结果类型
+classes = [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+]
+
+# 把Tensor转化为图片，方便可视化
+show = ToPILImage()
+
+# 进入验证阶段
+for i in range(10):
+    x, y = test_dataset[i][0], test_dataset[i][1]
+    # show()：显示图片
+    show(x).show()
+    # unsqueeze(input, dim)，input(Tensor)：输入张量，dim (int)：插入维度的索引，最终将张量维度扩展为4维
+    x = Variable(torch.unsqueeze(x, dim=0).float(), requires_grad=False).to(device)
+    with torch.no_grad():
+        pred = model(x)
+        # argmax(input)：返回指定维度最大值的序号
+        # 得到验证类别中数值最高的那一类，再对应classes中的那一类
+        predicted, actual = classes[torch.argmax(pred[0])], classes[y]
+        # 输出预测值与真实值
+        print(f'predicted: "{predicted}", actual:"{actual}"')
